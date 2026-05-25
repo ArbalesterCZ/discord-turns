@@ -210,16 +210,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    regex_t turn_regex;
-    regex_t info_regex;
-
-    regcomp(&turn_regex, "Player ([0-7]) ended his turn", REG_EXTENDED);
-    regcomp(&info_regex, "Info about turn ([0-9]+)",      REG_EXTENDED);
-
     if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
         fprintf(stderr, "curl_global_init failed\n");
-        regfree(&turn_regex);
-        regfree(&info_regex);
         fclose(file);
         return 1;
     }
@@ -228,8 +220,6 @@ int main(int argc, char *argv[])
     if (inotify_fd < 0) {
         perror("inotify_init1");
         curl_global_cleanup();
-        regfree(&turn_regex);
-        regfree(&info_regex);
         fclose(file);
         return 1;
     }
@@ -240,11 +230,15 @@ int main(int argc, char *argv[])
         perror("inotify_add_watch");
         close(inotify_fd);
         curl_global_cleanup();
-        regfree(&turn_regex);
-        regfree(&info_regex);
         fclose(file);
         return 1;
     }
+
+    regex_t turn_regex;
+    regex_t info_regex;
+
+    regcomp(&turn_regex, "Player ([0-7]) ended his turn", REG_EXTENDED);
+    regcomp(&info_regex, "Info about turn ([0-9]+)",      REG_EXTENDED);
 
     char event_buf[EVENT_BUF_SIZE];
 
@@ -252,9 +246,8 @@ int main(int argc, char *argv[])
         ssize_t len = read(inotify_fd, event_buf, sizeof(event_buf));
 
         if (len < 0) {
-            if (errno == EINTR) {
+            if (errno == EINTR)
                 continue;
-            }
 
             perror("read");
             break;
