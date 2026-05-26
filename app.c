@@ -40,9 +40,8 @@ static int load_player_names(const char *players_file)
     while (fgets(line, sizeof(line), file) != NULL) {
         trim_newline(line);
 
-        if (line[0] == '\0') {
+        if (line[0] == '\0')
             continue;
-        }
 
         if (count >= MAX_PLAYERS) {
             fprintf(stderr, "The file containing the names has too many players. The maximum is %d.\n", MAX_PLAYERS);
@@ -154,29 +153,27 @@ static void handle_truncate(FILE *file, const char *filename)
     if (pos > st.st_size) {
         fprintf(stderr, "The log has been truncated or cleared; resetting the read position to the beginning.\n");
 
-        if (fseek(file, 0, SEEK_SET) != 0) {
+        if (fseek(file, 0, SEEK_SET) != 0)
             perror("fseek after shortening the file");
-        }
 
         clearerr(file);
     }
 }
 
-static void read_new_lines(FILE *file, regex_t *turn_regex, regex_t *info_regex, const char *webhook_url)
+static void read_new_lines(FILE *file, regex_t *turn_regex, regex_t *days_regex, const char *webhook_url)
 {
     char line[LINE_SIZE];
 
     while (fgets(line, sizeof(line), file) != NULL) {
         regmatch_t matches[2];
 
-        if (regexec(info_regex, line, 2, matches, 0) == 0) {
+        if (regexec(turn_regex, line, 2, matches, 0) == 0)
+            send_webhook(webhook_url, ":hourglass:", player_names[line[matches[1].rm_so] - '0']);
+        else if (regexec(days_regex, line, 2, matches, 0) == 0) {
             char usr[16];
 
             snprintf(usr, sizeof(usr), "Day %.*s", (int)(matches[1].rm_eo - matches[1].rm_so), line + matches[1].rm_so);
             send_webhook(webhook_url, ":sunny::new_moon::waxing_crescent_moon::first_quarter_moon::waxing_gibbous_moon::full_moon::waning_gibbous_moon::last_quarter_moon::waning_crescent_moon::new_moon::sunny:", usr);
-        }
-        else if (regexec(turn_regex, line, 2, matches, 0) == 0) {
-            send_webhook(webhook_url, ":hourglass:", player_names[line[matches[1].rm_so] - '0']);
         }
     }
 
@@ -194,9 +191,8 @@ int main(int argc, char *argv[])
     const char *players_file = argv[2];
     const char *webhook_url = argv[3];
 
-    if (load_player_names(players_file) != 0) {
+    if (load_player_names(players_file) != 0)
         return 1;
-    }
 
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -235,10 +231,10 @@ int main(int argc, char *argv[])
     }
 
     regex_t turn_regex;
-    regex_t info_regex;
+    regex_t days_regex;
 
     regcomp(&turn_regex, "Player ([0-7]) ended his turn", REG_EXTENDED);
-    regcomp(&info_regex, "Info about turn ([0-9]+)",      REG_EXTENDED);
+    regcomp(&days_regex, "Turn ([0-9]+)",                 REG_EXTENDED);
 
     char event_buf[EVENT_BUF_SIZE];
 
@@ -258,7 +254,7 @@ int main(int argc, char *argv[])
 
             if (event->mask & (IN_MODIFY | IN_ATTRIB)) {
                 handle_truncate(file, filename);
-                read_new_lines(file, &turn_regex, &info_regex, webhook_url);
+                read_new_lines(file, &turn_regex, &days_regex, webhook_url);
             }
 
             ptr += sizeof(struct inotify_event) + event->len;
@@ -269,8 +265,8 @@ int main(int argc, char *argv[])
     close(inotify_fd);
 
     curl_global_cleanup();
-    regfree(&info_regex);
     regfree(&turn_regex);
+    regfree(&days_regex);
     fclose(file);
 
     return 0;
