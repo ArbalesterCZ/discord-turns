@@ -160,6 +160,15 @@ static void handle_truncate(FILE *file, const char *filename)
     }
 }
 
+static void game_format(char *usr, const size_t usr_len, const int days)
+{
+    const int month = days / 28;
+    const int week = days % 28 / 7;
+    const int day = days % 7;
+
+    snprintf(usr, usr_len, "Month %d┃Week %d┃Day %d", month+1, week+1, day+1);
+}
+
 static void read_new_lines(FILE *file, regex_t *turn_regex, regex_t *days_regex, const char *webhook_url)
 {
     char line[LINE_SIZE];
@@ -170,9 +179,10 @@ static void read_new_lines(FILE *file, regex_t *turn_regex, regex_t *days_regex,
         if (regexec(turn_regex, line, 2, matches, 0) == 0)
             send_webhook(webhook_url, ":hourglass:", player_names[line[matches[1].rm_so] - '0']);
         else if (regexec(days_regex, line, 2, matches, 0) == 0) {
-            char usr[16];
+            char usr[64];
 
-            snprintf(usr, sizeof(usr), "Day %.*s", (int)(matches[1].rm_eo - matches[1].rm_so), line + matches[1].rm_so);
+            snprintf(usr, sizeof(usr), "%.*s", (int)(matches[1].rm_eo - matches[1].rm_so), line + matches[1].rm_so);
+            game_format(usr, sizeof(usr), atoi(usr)-1);
             send_webhook(webhook_url, ":sunny::new_moon::waxing_crescent_moon::first_quarter_moon::waxing_gibbous_moon::full_moon::waning_gibbous_moon::last_quarter_moon::waning_crescent_moon::new_moon::sunny:", usr);
         }
     }
